@@ -35,7 +35,7 @@ A service that generates a **night-shift handover for the morning manager.** Spe
 
 3. **Generate an action-first handover.** A morning manager reading it should know within 60 seconds what's on fire, what's pending, and what's just FYI. We are **not** looking for a chronological retelling of the night.
 
-4. **Ground every statement in the input.** The handover must not state anything that isn't supported by the data, and must **flag incomplete or contradictory entries** rather than paper over them. Show us how you ensured this — it's the part we care about most, because this runs unattended across hundreds of hotels.
+4. **Ground every statement in the input.** The handover must not state anything that isn't supported by the data, and must **flag incomplete or contradictory entries** rather than paper over them. This is the part we care about most, because it runs unattended across hundreds of hotels. The bar is grounding, not tool choice — use a model wherever it helps (the input is messy, open-ended, and may not be in English), as long as every statement traces back to the source. Show us how you ensured that.
 
 ### Also required
 
@@ -52,7 +52,7 @@ A service that generates a **night-shift handover for the morning manager.** Spe
 4. **`DECISIONS.md`** covering:
    - What you built and what you deliberately skipped (and why).
    - How you handle reconciliation across nights.
-   - How you prevent the AI from inventing facts, and how you handle incomplete/contradictory input.
+   - How you keep every statement grounded and handle incomplete/contradictory input — and, if you use a model anywhere in the pipeline, how you stop it inventing facts.
    - Where AI helped most, and where it got in the way.
    - What you'd do in hours 3–6 if you had them.
    - One thing that surprised you.
