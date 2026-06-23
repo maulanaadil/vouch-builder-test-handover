@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: vouch-handover-maulanaadil
+    runtime: docker
+    region: singapore
+    plan: free
+    branch: main
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: LLM_ENABLED
+        value: "true"
+      - key: ANTHROPIC_MODEL
+        value: claude-haiku-4-5
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: LOG_LEVEL
+        value: info
