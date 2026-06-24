@@ -22,11 +22,32 @@ curl "http://127.0.0.1:3000/handover?date=2026-05-30&format=json" | jq
 LLM_ENABLED=false node dist/server.js
 ```
 
-Deployed: **`<DEPLOYED_URL>` — see "Deploy" below**
+**Live deployment:** `https://vouch-handover-maulanaadil-31840567299.asia-southeast1.run.app` (Google Cloud Run, `asia-southeast1`).
 
 ```bash
-curl "<DEPLOYED_URL>/handover?date=2026-05-30&format=html"
+BASE=https://vouch-handover-maulanaadil-31840567299.asia-southeast1.run.app
+
+# Liveness
+curl "$BASE/health"
+
+# JSON handover for the interesting morning in the bundled demo data
+curl "$BASE/handover?date=2026-05-30&format=json" | jq
+
+# HTML view (open in browser)
+open "$BASE/handover?date=2026-05-30&format=html"
+
+# Caller-supplied payload (multi-hotel friendly — see POST /handover below)
+EVENTS=$(jq '.events'  data/events.json)
+HOTEL=$(jq  '.hotel'   data/events.json)
+NIGHTLOG=$(jq -Rs . < data/night-logs.md)
+curl -s -X POST "$BASE/handover" \
+  -H 'content-type: application/json' \
+  -d "{\"hotel\": $HOTEL, \"events\": $EVENTS, \"nightLog\": $NIGHTLOG, \"targetMorning\": \"2026-05-30\"}" \
+  | jq '.sections | with_entries(.value |= length)'
+# expected: on_fire:6, still_open:5, new_tonight:0, newly_resolved:0, flagged_for_review:4, fyi:4
 ```
+
+Cloud Run scales to zero, so the first request after idle takes ~3–5 s; warm requests are ~50 ms.
 
 ---
 
@@ -135,7 +156,7 @@ NIGHTLOG=$(jq -Rs . < data/night-logs.md)
 curl -s -X POST http://127.0.0.1:3000/handover \
   -H 'content-type: application/json' \
   -d "{\"hotel\": $HOTEL, \"events\": $EVENTS, \"nightLog\": $NIGHTLOG, \"targetMorning\": \"2026-05-30\"}" \
-  | jq '.sections.on_fire | length'
+  | jq '.sections | with_entries(.value |= length)'
 ```
 
 Logs are structured Pino JSON tagged with `{ hotel_id, shift_date, request_id, stage }` so a bad handover can be traced end-to-end. Stages: `ingest → extract → thread → reconcile → render → http`.
