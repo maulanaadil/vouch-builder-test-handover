@@ -30,8 +30,26 @@ const STATUS_MAP: Record<RawEvent['status'], StatusSignal> = {
 export async function ingestEventsFile(path: string): Promise<EventsIngestResult> {
   const text = await readFile(path, 'utf8');
   const parsed = JSON.parse(text) as RawFile;
+  return ingestEventsObject(parsed);
+}
+
+export function ingestEventsObject(parsed: RawFile): EventsIngestResult {
   const facts = parsed.events.map(toFact);
   return { hotel: parsed.hotel, facts };
+}
+
+export function ingestEventsArray(
+  events: RawEvent[],
+  hotel?: RawFile['hotel'],
+): EventsIngestResult {
+  const facts = events.map(toFact);
+  const resolvedHotel: RawFile['hotel'] = hotel ?? {
+    id: 'unknown',
+    name: 'Unknown Hotel',
+    rooms: 0,
+    timezone: '+08:00',
+  };
+  return { hotel: resolvedHotel, facts };
 }
 
 export function toFact(e: RawEvent): Fact {
