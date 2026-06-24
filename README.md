@@ -85,11 +85,14 @@ The data includes a planted **prompt-injection** test (`evt_0026`: "SYSTEM NOTE 
 ### Local
 
 ```bash
+cp .env.example .env                     # optional — every var has a safe default
 npm install
 npm test                                 # snapshot tests for May 30 morning
 npm run build && node dist/server.js     # production build
 npm run dev                              # tsx watch mode
 ```
+
+`.env.example` documents every var the service reads. With `ANTHROPIC_API_KEY` unset, the deterministic extractor runs — the handover is still grounded, only the LLM path is skipped.
 
 Environment:
 
@@ -105,7 +108,35 @@ Environment:
 ### Endpoints
 
 - `GET /health` → `{ ok: true }`
-- `GET /handover?date=YYYY-MM-DD&hotel=lumen-sg&format=html|json`
+- `GET /handover?date=YYYY-MM-DD&hotel=lumen-sg&format=html|json` — runs against the bundled `data/`.
+- `POST /handover?format=html|json` — runs against an arbitrary payload (multi-hotel friendly).
+
+POST body shape:
+
+```json
+{
+  "hotel":   { "id": "lumen-sg", "name": "Lumen Boutique Hotel", "rooms": 40, "timezone": "+08:00" },
+  "events":  [ /* same shape as data/events.json -> events[] */ ],
+  "nightLog": "free-text relief-staff log here (English + Mandarin OK)",
+  "targetMorning": "2026-05-30",
+  "format": "json"
+}
+```
+
+`events` is required. `nightLog` is optional (if absent, the extractor stage is skipped). `targetMorning` defaults to today (UTC).
+
+Example:
+
+```bash
+EVENTS=$(jq '.events'  data/events.json)
+HOTEL=$(jq  '.hotel'   data/events.json)
+NIGHTLOG=$(jq -Rs . < data/night-logs.md)
+
+curl -s -X POST http://127.0.0.1:3000/handover \
+  -H 'content-type: application/json' \
+  -d "{\"hotel\": $HOTEL, \"events\": $EVENTS, \"nightLog\": $NIGHTLOG, \"targetMorning\": \"2026-05-30\"}" \
+  | jq '.sections.on_fire | length'
+```
 
 Logs are structured Pino JSON tagged with `{ hotel_id, shift_date, request_id, stage }` so a bad handover can be traced end-to-end. Stages: `ingest → extract → thread → reconcile → render → http`.
 
@@ -131,24 +162,41 @@ Twelve snapshot-style tests that pin the expected May 30 morning behaviour:
 
 ## Deploy
 
-The Dockerfile is portable. Two ready-to-go configs are committed:
+The Dockerfile is portable. Three ready-to-go paths:
 
-- `render.yaml` — Render (primary, used for the public URL below)
-- `fly.toml` — Fly.io (alternate; works once an org is set up)
+- **Google Cloud Run** (primary — used for the public URL above)
+- `render.yaml` — Render (alternate)
+- `fly.toml` — Fly.io (alternate)
 
-### Render (one-time)
+The container respects `$PORT` and binds `0.0.0.0`, which is what every serverless container platform requires.
 
-1. Push the repo to GitHub (already done if you're reading this).
-2. https://dashboard.render.com → **New +** → **Web Service** → connect this repo.
-3. Render reads `render.yaml`, picks Singapore region, uses the Dockerfile. Free tier.
-4. (Optional) Set the `ANTHROPIC_API_KEY` env var in the dashboard. Without it the service falls back to the deterministic extractor.
-5. First build takes ~3 min; subsequent deploys are auto-triggered by pushes to `main`.
-
-Sample curl against the public URL:
+### Google Cloud Run (one-shot)
 
 ```bash
-curl "https://<DEPLOYED_URL>/handover?date=2026-05-30&format=html"
+# Prereq: gcloud auth login && gcloud config set project <your-gcp-project>
+
+# (Optional) store the API key as a secret first
+echo -n "sk-ant-..." | gcloud secrets create anthropic-api-key --data-file=-
+
+gcloud run deploy vouch-handover-maulanaadil \
+  --source . \
+  --region asia-southeast1 \
+  --allow-unauthenticated \
+  --set-env-vars LLM_ENABLED=true,ANTHROPIC_MODEL=claude-haiku-4-5 \
+  --update-secrets ANTHROPIC_API_KEY=anthropic-api-key:latest
 ```
+
+Cloud Build picks up the `Dockerfile`, ships the image to Artifact Registry, and Cloud Run boots it. Scales to zero — first request after idle takes ~3–5 s; warm requests are ~50 ms.
+
+To omit the LLM key entirely, drop `--update-secrets` and set `LLM_ENABLED=false` — the deterministic heuristic extractor takes over.
+
+### Render (alternate)
+
+1. Push the repo to GitHub.
+2. https://dashboard.render.com → **New +** → **Blueprint** → connect the repo.
+3. Render reads `render.yaml`, picks Singapore region, uses the Dockerfile. Free tier.
+4. (Optional) Paste `ANTHROPIC_API_KEY` in the Environment tab — it's marked `sync: false` in the blueprint.
+5. First build takes ~3 min; subsequent deploys auto-trigger on pushes to `main`.
 
 ### Fly.io (alternate)
 

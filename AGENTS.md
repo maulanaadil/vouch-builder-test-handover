@@ -27,7 +27,7 @@ If you find yourself wanting to break one of these to fix a bug: the bug is some
 
 ```
 src/
-  server.ts              # Fastify app, GET /handover
+  server.ts              # Fastify app: GET /handover (bundled data), POST /handover (caller payload)
   config.ts              # env vars, paths
   ingest/
     events.ts            # JSON → Fact[], topic classification, injection + imminent-checkout detectors

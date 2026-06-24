@@ -11,6 +11,7 @@ Start: 23 Jun 2026 ~18:00. Stop: 23 Jun 2026 ~20:00. (Confirm before you send.)
 A Node.js + TypeScript service (Fastify) with a single endpoint `GET /handover?date=YYYY-MM-DD&format=html|json`. It:
 
 - Ingests both formats — structured `events.json` and free-text `night-logs.md` — into one typed `Fact` store. Every fact carries `{ source.kind, source.ref, source.rawQuote }` so its lineage is always one hop away.
+- Exposes both `GET /handover` (runs against the bundled demo data — what a reviewer curls) and `POST /handover` (accepts an arbitrary `{hotel, events, nightLog, targetMorning}` payload — what a downstream service would call). Same pipeline, same grounding guarantees, same renderer.
 - Threads facts across nights by `(topic, room)` (or `(topic, "_property")` for property-wide threads like the corridor leak, scanner backlog, and walk-ins).
 - Reconciles each thread against a configurable shift window (default 23:00–07:00 SGT) into six buckets: **ON FIRE NOW**, **STILL OPEN**, **NEW TONIGHT**, **NEWLY RESOLVED OVERNIGHT**, **FLAGGED FOR REVIEW**, **FYI**.
 - Renders HTML or JSON. Every line shows its citation IDs (`evt_0009`, `nl_06_2026-05-28`) and the underlying facts are revealed via a collapsible `<details>` block.
@@ -23,7 +24,7 @@ A Node.js + TypeScript service (Fastify) with a single endpoint `GET /handover?d
 | Skipped | Why |
 |---|---|
 | Database, caching, persistence | Recompute from source each call. For one hotel × ~30 events the latency is single-digit ms (we re-parse, re-thread, re-reconcile). Adding storage is a multi-hour decision, not a 2-hour one — and the production design would likely be event-sourced anyway. |
-| Multi-hotel runtime loader | The code is parameterised on `hotel_id` (URL param) and `DATA_DIR` (env var); only one hotel's data is wired in. Wiring an S3 or Postgres backed loader is mechanical. |
+| Multi-hotel runtime *loader* | `POST /handover` accepts an arbitrary payload, so a downstream caller can already drive any hotel through the pipeline. What's deliberately skipped is the *server-side* loader (S3 / Postgres) that would fetch a hotel's data by id. Adding that is mechanical. |
 | Authentication / rate limiting | Out of scope. Behind a real gateway in production. |
 | Real language detection / general translation pipeline | The brief calls out Mandarin specifically and the LLM handles it natively. I keep the original `source_quote` verbatim and only use the English `summary_en` for the rendered line. The `translated` flag is emitted whenever the LLM declares it added a gloss. |
 | Polished UI | Utility CSS only — the brief says "utility over beauty." The collapsible source view is worth more than a layout. |
